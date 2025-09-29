@@ -12,6 +12,11 @@ class LaiziManager {
 
     // 计算玩家可用的癞子数量
     getUsableLaiziCount(player, handCards) {
+        if (!handCards || !Array.isArray(handCards)) {
+            console.warn('getUsableLaiziCount: handCards is not a valid array', handCards);
+            return 0;
+        }
+
         const laiziCards = handCards.filter(card => this.deck.isLaizi(card));
 
         if (this.canUseMultipleLaizi(player)) {
@@ -25,11 +30,19 @@ class LaiziManager {
 
     // 获取玩家手中的癞子牌
     getLaiziCards(handCards) {
+        if (!handCards || !Array.isArray(handCards)) {
+            console.warn('getLaiziCards: handCards is not a valid array', handCards);
+            return [];
+        }
         return handCards.filter(card => this.deck.isLaizi(card));
     }
 
     // 获取玩家手中的非癞子牌
     getNonLaiziCards(handCards) {
+        if (!handCards || !Array.isArray(handCards)) {
+            console.warn('getNonLaiziCards: handCards is not a valid array', handCards);
+            return [];
+        }
         return handCards.filter(card => !this.deck.isLaizi(card));
     }
 

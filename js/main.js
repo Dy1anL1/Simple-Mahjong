@@ -28,6 +28,11 @@ class GameController {
             this.startGame();
         });
 
+        // 出牌按钮
+        document.getElementById('discard').addEventListener('click', () => {
+            this.handleDiscardButton();
+        });
+
         // 操作按钮
         document.getElementById('chi').addEventListener('click', () => {
             this.handleAction('chi');
@@ -76,16 +81,23 @@ class GameController {
         if (this.game.currentPlayerIndex === 0) {
             const cardIndex = this.getClickedCardIndex(x, y, humanPlayer.handCards.length);
             if (cardIndex !== -1) {
+                console.log(`点击了第${cardIndex}张牌`);
                 if (this.selectedCardIndex === cardIndex) {
-                    // 双击打牌
+                    // 双击同一张牌，打出
+                    console.log('双击打牌');
                     this.discardCard(cardIndex);
                 } else {
                     // 选择牌
+                    console.log('选择牌');
                     this.selectedCardIndex = cardIndex;
                     humanPlayer.selectedCardIndex = cardIndex;
                     this.drawGame();
                 }
+            } else {
+                console.log('点击区域无效', { x, y });
             }
+        } else {
+            console.log('不是玩家回合，当前玩家：', this.game.currentPlayerIndex);
         }
     }
 
@@ -106,14 +118,29 @@ class GameController {
         return -1;
     }
 
+    // 处理出牌按钮点击
+    handleDiscardButton() {
+        if (this.selectedCardIndex === -1) {
+            alert('请先选择一张牌');
+            return;
+        }
+        this.discardCard(this.selectedCardIndex);
+    }
+
     // 打牌
     discardCard(cardIndex) {
         try {
+            console.log('尝试打出第' + cardIndex + '张牌');
             const result = this.game.playerDiscard(0, cardIndex);
             this.selectedCardIndex = -1;
 
-            if (result.waitingForResponse) {
+            console.log('出牌结果:', result);
+
+            if (result && result.waitingForResponse) {
                 this.handleWaitingForResponse(result.actions);
+            } else {
+                // 没有人要牌，游戏继续
+                console.log('没有人要牌，游戏继续');
             }
 
             this.updateUI();
@@ -138,7 +165,8 @@ class GameController {
         // 设置超时，如果没有响应就继续游戏
         setTimeout(() => {
             if (this.waitingForResponse) {
-                this.game.nextPlayerTurn();
+                console.log('响应超时，继续游戏');
+                this.game.playerResponse(0, 'pass'); // 人类玩家选择不响应
                 this.waitingForResponse = false;
                 this.updateUI();
                 this.drawGame();
@@ -199,8 +227,10 @@ class GameController {
         // 更新按钮状态
         const isHumanTurn = gameState.currentPlayer === 0 && gameState.gamePhase === 'playing';
         const gameStarted = gameState.gamePhase !== 'waiting';
+        const hasSelectedCard = this.selectedCardIndex !== -1;
 
         document.getElementById('start-game').disabled = gameStarted;
+        document.getElementById('discard').disabled = !isHumanTurn || !hasSelectedCard;
 
         if (!this.waitingForResponse) {
             document.getElementById('chi').disabled = true;
@@ -372,22 +402,147 @@ class GameController {
 
     // 绘制打出的牌
     drawDiscardedCards(gameState) {
-        if (gameState.lastDiscarded) {
-            const card = gameState.lastDiscarded.card;
-            const x = this.canvas.width / 2 - 20;
-            const y = this.canvas.height / 2 - 30;
-
-            this.drawCard(card, x, y, 40, 60);
-
-            // 显示是谁打出的
-            this.ctx.fillStyle = '#ffff00';
-            this.ctx.font = '14px Microsoft YaHei';
-            this.ctx.fillText(
-                `${this.game.players[gameState.lastDiscarded.player].name}打出`,
-                this.canvas.width / 2,
-                y - 10
-            );
+        // 为每个玩家绘制打出的牌
+        for (let i = 0; i < this.game.players.length; i++) {
+            const player = this.game.players[i];
+            if (player.discardedCards.length > 0) {
+                this.drawPlayerDiscardedCards(player, i);
+            }
         }
+
+        // 高亮显示最后一张打出的牌
+        if (gameState.lastDiscarded) {
+            const lastPlayer = this.game.players[gameState.lastDiscarded.player];
+            const lastCard = gameState.lastDiscarded.card;
+            const lastCardIndex = lastPlayer.discardedCards.length - 1;
+
+            this.highlightLastDiscardedCard(gameState.lastDiscarded.player, lastCardIndex, lastCard);
+        }
+    }
+
+    // 绘制单个玩家打出的牌
+    drawPlayerDiscardedCards(player, playerIndex) {
+        const cardWidth = 25;
+        const cardHeight = 35;
+        const cardsPerRow = 6; // 每行显示6张牌
+
+        let baseX, baseY;
+
+        // 根据玩家位置确定打牌区域
+        switch (playerIndex) {
+            case 0: // 人类玩家 - 下方
+                baseX = this.canvas.width / 2 - (cardsPerRow * cardWidth) / 2;
+                baseY = this.canvas.height - 160; // 调整位置，避免与手牌重叠
+                break;
+            case 1: // 右侧玩家
+                baseX = this.canvas.width - 180;
+                baseY = this.canvas.height / 2 - (cardsPerRow * cardHeight) / 2;
+                break;
+            case 2: // 上方玩家
+                baseX = this.canvas.width / 2 - (cardsPerRow * cardWidth) / 2;
+                baseY = 120; // 调整位置，避免与牌桌边框重叠
+                break;
+            case 3: // 左侧玩家
+                baseX = 120; // 调整位置，给癞子信息留出空间
+                baseY = this.canvas.height / 2 - (cardsPerRow * cardHeight) / 2;
+                break;
+        }
+
+        // 绘制玩家名称
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.font = '12px Microsoft YaHei';
+        this.ctx.textAlign = 'center';
+
+        let nameX, nameY;
+        if (playerIndex === 0) {
+            nameX = baseX + (cardsPerRow * cardWidth) / 2;
+            nameY = baseY - 10;
+        } else if (playerIndex === 2) {
+            nameX = baseX + (cardsPerRow * cardWidth) / 2;
+            nameY = baseY - 10;
+        } else {
+            nameX = baseX + (playerIndex === 1 ? -20 : (cardsPerRow * cardWidth) + 20);
+            nameY = baseY + (cardsPerRow * cardHeight) / 2;
+        }
+
+        this.ctx.fillText(`${player.name}打出`, nameX, nameY);
+
+        // 绘制打出的牌
+        player.discardedCards.forEach((card, index) => {
+            let x, y;
+
+            if (playerIndex === 0 || playerIndex === 2) {
+                // 水平排列
+                const row = Math.floor(index / cardsPerRow);
+                const col = index % cardsPerRow;
+                x = baseX + col * cardWidth;
+                y = baseY + row * cardHeight;
+            } else {
+                // 垂直排列
+                const row = index % cardsPerRow;
+                const col = Math.floor(index / cardsPerRow);
+                x = baseX + col * cardWidth;
+                y = baseY + row * cardHeight;
+            }
+
+            this.drawCard(card, x, y, cardWidth, cardHeight);
+        });
+    }
+
+    // 高亮显示最后一张打出的牌
+    highlightLastDiscardedCard(playerIndex, cardIndex, card) {
+        const cardWidth = 25;
+        const cardHeight = 35;
+        const cardsPerRow = 6;
+
+        let baseX, baseY;
+
+        // 根据玩家位置确定打牌区域（与drawPlayerDiscardedCards保持一致）
+        switch (playerIndex) {
+            case 0:
+                baseX = this.canvas.width / 2 - (cardsPerRow * cardWidth) / 2;
+                baseY = this.canvas.height - 160;
+                break;
+            case 1:
+                baseX = this.canvas.width - 180;
+                baseY = this.canvas.height / 2 - (cardsPerRow * cardHeight) / 2;
+                break;
+            case 2:
+                baseX = this.canvas.width / 2 - (cardsPerRow * cardWidth) / 2;
+                baseY = 120;
+                break;
+            case 3:
+                baseX = 120;
+                baseY = this.canvas.height / 2 - (cardsPerRow * cardHeight) / 2;
+                break;
+        }
+
+        let x, y;
+
+        if (playerIndex === 0 || playerIndex === 2) {
+            // 水平排列
+            const row = Math.floor(cardIndex / cardsPerRow);
+            const col = cardIndex % cardsPerRow;
+            x = baseX + col * cardWidth;
+            y = baseY + row * cardHeight;
+        } else {
+            // 垂直排列
+            const row = cardIndex % cardsPerRow;
+            const col = Math.floor(cardIndex / cardsPerRow);
+            x = baseX + col * cardWidth;
+            y = baseY + row * cardHeight;
+        }
+
+        // 绘制高亮边框
+        this.ctx.strokeStyle = '#ffff00';
+        this.ctx.lineWidth = 3;
+        this.ctx.strokeRect(x - 2, y - 2, cardWidth + 4, cardHeight + 4);
+
+        // 添加闪烁效果的文字
+        this.ctx.fillStyle = '#ffff00';
+        this.ctx.font = '10px Microsoft YaHei';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('刚打出', x + cardWidth / 2, y - 5);
     }
 
     // 绘制癞子信息
@@ -395,20 +550,32 @@ class GameController {
         const laiziInfo = gameState.laiziInfo;
         if (laiziInfo.laiziCard) {
             const x = 20;
-            const y = this.canvas.height - 120;
+            const y = 50; // 移到屏幕上方，避免与左侧玩家打牌区域重叠
+
+            // 绘制标题背景
+            this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            this.ctx.fillRect(x - 5, y - 20, 80, 130);
 
             // 绘制翻开的牌
             this.ctx.fillStyle = '#ffffff';
-            this.ctx.font = '14px Microsoft YaHei';
+            this.ctx.font = '12px Microsoft YaHei';
+            this.ctx.textAlign = 'left';
             this.ctx.fillText('翻牌:', x, y);
 
-            this.drawCard(laiziInfo.flippedCard, x, y + 10, 35, 50);
+            this.drawCard(laiziInfo.flippedCard, x, y + 5, 30, 45);
 
             // 绘制癞子牌
-            this.ctx.fillText('癞子:', x, y + 70);
+            this.ctx.fillText('癞子:', x, y + 60);
             const laiziCard = laiziInfo.laiziCard.clone();
             laiziCard.isLaizi = true;
-            this.drawCard(laiziCard, x, y + 80, 35, 50);
+            this.drawCard(laiziCard, x, y + 65, 30, 45);
+
+            // 如果红中是癞子，添加特殊标记
+            if (laiziInfo.isHongZhongLaizi) {
+                this.ctx.fillStyle = '#ff0000';
+                this.ctx.font = '10px Microsoft YaHei';
+                this.ctx.fillText('杠牌+癞子', x + 35, y + 90);
+            }
         }
     }
 
