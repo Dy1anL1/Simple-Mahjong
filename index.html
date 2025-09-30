@@ -3,32 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>武汉麻将</title>
+    <title>武汉麻将 - 传统中国麻将在线游戏</title>
+    <meta name="description" content="体验正宗武汉麻将，传统规则，精美界面，单人对战智能AI。支持癞子规则和红中杠牌特殊玩法。">
+    <meta name="keywords" content="武汉麻将,中国麻将,在线麻将,传统麻将,麻将游戏">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="武汉麻将 - 传统中国麻将游戏">
+    <meta property="og:description" content="体验正宗武汉麻将，传统规则，精美界面和智能AI对手">
+    <meta property="og:type" content="website">
+
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <div id="game-container">
-        <div id="game-board">
-            <canvas id="game-canvas" width="1200" height="800"></canvas>
-        </div>
-        <div id="game-controls">
-            <button id="start-game">开始游戏</button>
-            <button id="discard" disabled>出牌</button>
-            <button id="chi" disabled>吃</button>
-            <button id="peng" disabled>碰</button>
-            <button id="gang" disabled>杠</button>
-            <button id="hu" disabled>胡</button>
-        </div>
-        <div id="game-info">
-            <div id="laizi-info">癞子: <span id="laizi-card">未定</span></div>
-            <div id="current-player">当前玩家: <span id="player-turn">1</span></div>
-        </div>
+        <!-- 游戏标题和介绍区域 -->
+        <header id="game-header">
+            <h1 id="game-title">武汉麻将</h1>
+            <p id="game-subtitle">正宗武汉麻将 · 传统规则 · 智能AI对战</p>
+            <div id="game-description">
+                <div class="rule-item">
+                    <span class="rule-icon">🀄</span>
+                    <span>红中自带杠牌属性</span>
+                </div>
+                <div class="rule-item">
+                    <span class="rule-icon">🎴</span>
+                    <span>癞子万能替换</span>
+                </div>
+                <div class="rule-item">
+                    <span class="rule-icon">🎯</span>
+                    <span>简化版武汉规则</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 游戏主要区域 -->
+        <main id="game-main">
+            <div id="game-board">
+                <canvas id="game-canvas"></canvas>
+                <!-- 游戏开始覆盖层 -->
+                <div id="game-start-overlay">
+                    <div id="start-content">
+                        <h2>准备开始游戏</h2>
+                        <p>点击下方按钮开始一局精彩的武汉麻将</p>
+                        <button id="start-game" class="primary-button">
+                            <span class="button-icon">🎮</span>
+                            开始游戏
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 游戏控制区域 -->
+            <div id="game-controls">
+                <div id="action-buttons">
+                    <button id="discard" disabled>出牌</button>
+                    <button id="chi" disabled>吃</button>
+                    <button id="peng" disabled>碰</button>
+                    <button id="gang" disabled>杠</button>
+                    <button id="hu" disabled>胡</button>
+                </div>
+            </div>
+
+            <!-- 游戏信息区域 -->
+            <div id="game-info">
+                <div id="laizi-info">
+                    <span class="info-label">癞子:</span>
+                    <span id="laizi-card">未定</span>
+                </div>
+                <div id="current-player">
+                    <span class="info-label">当前玩家:</span>
+                    <span id="player-turn">1</span>
+                </div>
+            </div>
+        </main>
     </div>
 
     <script src="js/card.js"></script>
     <script src="js/deck.js"></script>
     <script src="js/player.js"></script>
     <script src="js/laizi.js"></script>
+    <script src="js/tile-renderer.js"></script>
+    <script src="js/toast.js"></script>
     <script src="js/game.js"></script>
     <script src="js/main.js"></script>
 </body>

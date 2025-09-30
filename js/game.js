@@ -463,15 +463,36 @@ class WuhanMahjongGame {
     // 下一个玩家的回合
     nextPlayerTurn() {
         this.currentPlayerIndex = (this.currentPlayerIndex + 1) % 4;
+        const currentPlayer = this.players[this.currentPlayerIndex];
 
-        console.log(`轮到玩家 ${this.currentPlayerIndex} (${this.players[this.currentPlayerIndex].name})`);
+        console.log(`轮到玩家 ${this.currentPlayerIndex} (${currentPlayer.name})`);
+        console.log(`当前手牌数: ${currentPlayer.handCards.length}`);
 
-        // 如果是电脑玩家，自动执行操作
-        if (!this.players[this.currentPlayerIndex].isHuman) {
+        // 检查并确保玩家有正确的手牌数
+        if (currentPlayer.handCards.length === 13) {
+            console.log(`${currentPlayer.name} 手牌13张，需要摸一张牌`);
+            try {
+                this.playerDraw(this.currentPlayerIndex);
+                console.log(`${currentPlayer.name} 摸牌后手牌数: ${currentPlayer.handCards.length}`);
+            } catch (error) {
+                console.error(`${currentPlayer.name} 摸牌失败:`, error);
+                return;
+            }
+        } else if (currentPlayer.handCards.length !== 14) {
+            console.error(`${currentPlayer.name} 手牌数异常: ${currentPlayer.handCards.length}`);
+        }
+
+        // 如果是电脑玩家，继续自动执行操作
+        if (!currentPlayer.isHuman) {
             console.log('准备执行AI回合');
             this.executeAITurn();
         } else {
             console.log('等待人类玩家操作');
+            // 更新UI以反映新的手牌状态
+            if (window.gameController) {
+                window.gameController.updateUI();
+                window.gameController.drawGame();
+            }
         }
     }
 
@@ -493,20 +514,12 @@ class WuhanMahjongGame {
                     return;
                 }
 
-                console.log(`${aiPlayer.name} 摸牌前手牌数: ${aiPlayer.handCards.length}`);
+                console.log(`${aiPlayer.name} 当前手牌数: ${aiPlayer.handCards.length}`);
 
-                // 摸牌
-                const drawResult = this.playerDraw(playerIndex);
-                if (drawResult && drawResult.gameOver) {
-                    console.log('游戏结束，停止AI执行');
-                    return;
-                }
-
-                console.log(`${aiPlayer.name} 摸牌后手牌数: ${aiPlayer.handCards.length}`);
-
-                // 再次检查当前玩家（防止摸牌过程中回合发生变化）
-                if (this.currentPlayerIndex !== playerIndex) {
-                    console.warn(`摸牌后AI回合被中断，当前玩家: ${this.currentPlayerIndex}`);
+                // 确认手牌数正确（摸牌逻辑已在nextPlayerTurn中处理）
+                if (aiPlayer.handCards.length !== 14) {
+                    console.error(`${aiPlayer.name} 手牌数异常: ${aiPlayer.handCards.length}，跳过回合`);
+                    this.nextPlayerTurn();
                     return;
                 }
 
@@ -517,7 +530,7 @@ class WuhanMahjongGame {
                 const currentHandSize = aiPlayer.handCards.length;
                 console.log(`${aiPlayer.name} 准备出牌，当前手牌数: ${currentHandSize}`);
 
-                if (currentHandSize > 0) {
+                if (currentHandSize >= 14) {
                     // 随机选择一张牌打出
                     const randomIndex = Math.floor(Math.random() * currentHandSize);
                     const cardToDiscard = aiPlayer.handCards[randomIndex];
@@ -532,7 +545,7 @@ class WuhanMahjongGame {
                     this.playerDiscard(playerIndex, randomIndex);
                     console.log(`${aiPlayer.name} 成功打出牌`);
                 } else {
-                    console.error(`${aiPlayer.name} 手牌为空，无法出牌`);
+                    console.error(`${aiPlayer.name} 手牌数不足，无法出牌，手牌数: ${currentHandSize}`);
                     this.nextPlayerTurn();
                 }
             } catch (error) {
@@ -594,8 +607,77 @@ class WuhanMahjongGame {
         throw new Error('无法执行暗杠');
     }
 
+    // 尝试暗杠（为UI提供的方法）
+    tryAnGang(playerIndex) {
+        if (playerIndex !== this.currentPlayerIndex) {
+            return false;
+        }
+
+        const player = this.players[playerIndex];
+        console.log(`检查 ${player.name} 是否可以暗杠`);
+
+        // 统计手牌中每种牌的数量
+        const cardCounts = new Map();
+        player.handCards.forEach(card => {
+            const key = card.getKey();
+            cardCounts.set(key, (cardCounts.get(key) || 0) + 1);
+        });
+
+        // 找到第一个可以暗杠的牌（4张相同）
+        for (let [cardKey, count] of cardCounts) {
+            if (count >= 4) {
+                // 找到可以暗杠的牌
+                const cardsToGang = player.handCards.filter(card => card.getKey() === cardKey).slice(0, 4);
+                console.log(`找到可暗杠的牌: ${cardsToGang[0].getDisplayName()}`);
+
+                // 执行暗杠
+                cardsToGang.forEach(card => {
+                    const index = player.handCards.indexOf(card);
+                    player.handCards.splice(index, 1);
+                });
+
+                // 添加到杠牌区
+                if (!player.gangCards) {
+                    player.gangCards = [];
+                }
+                player.gangCards.push({
+                    type: 'angang',
+                    cards: cardsToGang
+                });
+
+                console.log(`${player.name} 暗杠了 ${cardsToGang[0].getDisplayName()}`);
+
+                // 暗杠后从牌尾摸一张牌
+                this.playerDrawFromTail(playerIndex);
+
+                return true;
+            }
+        }
+
+        console.log(`${player.name} 没有可以暗杠的牌`);
+        return false;
+    }
+
+    // 检查自摸胡牌
+    checkSelfWin(playerIndex) {
+        const player = this.players[playerIndex];
+        console.log(`检查 ${player.name} 是否可以自摸胡牌`);
+
+        // 使用现有的胡牌检测逻辑
+        return this.canPlayerWin(player);
+    }
+
     // 获取游戏状态
     getGameState() {
+        // 调试：输出所有玩家手牌数
+        if (this.gamePhase === 'playing') {
+            console.log('=== 所有玩家手牌数检查 ===');
+            this.players.forEach((player, index) => {
+                console.log(`玩家${index + 1}(${player.name}): ${player.handCards.length}张`);
+            });
+            console.log('=========================');
+        }
+
         return {
             gamePhase: this.gamePhase,
             currentPlayer: this.currentPlayerIndex,
